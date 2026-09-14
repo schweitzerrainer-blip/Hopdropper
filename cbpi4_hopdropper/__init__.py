@@ -107,11 +107,11 @@ class HopDropperActor(CBPiActor):
 
 
 @parameters([
-    Property.Number(label="Kettle", configurable=True, description="Kettle ID"),
+    Property.Kettle(label="Kettle", description="Kessel"),
     Property.Sensor(label="Sensor", description="Temperatursensor zum Starten des Timers"),
     Property.Number(label="Temp", configurable=True,
                     description="Ab dieser Temperatur startet der Timer"),
-    Property.Number(label="Timer", configurable=True, description="Kochzeit in Minuten"),
+    Property.Number(label="Timer", configurable=True, default_value=60, description="Kochzeit in Minuten"),
     Property.Select(label="AutoMode", options=["Yes", "No"],
                     description="Kettlelogic automatisch ein- und ausschalten -> Yes"),
     Property.Select(label="LidAlert", options=["Yes", "No"],
@@ -225,7 +225,8 @@ class HopDropperStep(CBPiStep):
         return slots
 
     async def on_stop(self):
-        await self.timer.stop()
+        if self.timer is not None:
+            await self.timer.stop()
         self.summary = ""
         if self.AutoMode is True:
             await self.setAutoMode(False)
@@ -256,7 +257,12 @@ class HopDropperStep(CBPiStep):
         value = self.props.get("Hop_%s" % number, None)
         if value is None or value == "":
             return
-        if self.remaining_seconds is None or self.remaining_seconds > (float(value) * 60 + 1):
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            logger.warning("Ungültige Hopfenzeit Hop_%s: %r", number, value)
+            return
+        if self.remaining_seconds is None or self.remaining_seconds > (value * 60 + 1):
             return
         self.hops_added[number - 1] = True
         hop_name = self.props.get("Hop_%s_text" % number, "") or "Hopfengabe %s" % number
